@@ -278,14 +278,9 @@ public class ResultsPage extends Frame implements ActionListener {
         // Highest vote count (only meaningful if at least one vote exists)
         int topVotes = rows.isEmpty() ? 0 : rows.get(0).votes;
 
-        int rank = 0;
-        int previousVotes = -1;
         for (int i = 0; i < rows.size(); i++) {
             Row r = rows.get(i);
-            if (r.votes != previousVotes) {
-                rank = i + 1;              // equal votes share the same rank
-                previousVotes = r.votes;
-            }
+            int rank = computeRank(r.votes, rows);   // standard competition ranking
 
             boolean leader = totalVotes > 0 && r.votes == topVotes;
             Color background = leader ? LEADER_ROW : (i % 2 == 0 ? WHITE : ALT_ROW);
@@ -372,12 +367,16 @@ public class ResultsPage extends Frame implements ActionListener {
                 line1 = (ended ? "Winner: " : "Currently leading: ")
                         + w.candidate.getName() + " (" + w.candidate.getParty() + ")";
                 line2 = (ended ? "Winning percentage: " : "Current percentage: ")
-                        + percent + "  (" + topVotes + " of " + totalVotes + " votes)";
+                        + percent + "  (" + topVotes + " of " + pluralVotes(totalVotes) + ")";
             } else {
-                line1 = (ended ? "Result: Tie between " : "Currently tied: ")
+                String tieWord = (leaders.size() == 2) ? "between " : "among ";
+                line1 = (ended ? "Result: Tie " + tieWord : "Currently tied: ")
                         + joinNames(leaders);
-                line2 = "No single winner - each has " + topVotes
-                        + " votes (" + percent + " of all votes)";
+                // "each candidate" if everyone is tied, otherwise "each tied candidate"
+                String who = (leaders.size() == rows.size())
+                        ? "each candidate" : "each tied candidate";
+                line2 = "No single winner - " + who + " received "
+                        + pluralVotes(topVotes) + " (" + percent + " of all votes).";
                 resultColor = NAVY;
             }
         }
@@ -410,6 +409,27 @@ public class ResultsPage extends Frame implements ActionListener {
 
     private static String formatPercent(double percent) {
         return String.format("%.1f%%", percent);
+    }
+
+    /**
+     * Standard competition ranking ("1224"): rank = 1 + the number of
+     * candidates with strictly MORE votes. Tied candidates share a rank and
+     * the following rank(s) are skipped, e.g. votes 5, 5, 3, 0, 0 give
+     * ranks 1, 1, 3, 4, 4. Candidates with zero votes share a rank too.
+     */
+    private static int computeRank(int votes, List<Row> rows) {
+        int rank = 1;
+        for (Row other : rows) {
+            if (other.votes > votes) {
+                rank++;
+            }
+        }
+        return rank;
+    }
+
+    /** "1 vote" or "3 votes" (zero is plural: "0 votes"). */
+    private static String pluralVotes(int count) {
+        return count + (count == 1 ? " vote" : " votes");
     }
 
     /** "A", "A and B", or "A, B and C". */
